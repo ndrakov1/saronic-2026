@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Free anchorage and overnight mooring forecast for Greek islands — Saronic Gulf and Cyclades. Wind, gusts, wave shelter scoring per bay, 3-day forecast, tides, distance tool. No login.">
+<title>Greek Islands · Anchorage Forecast</title>
+<style>
+:root {
+  --bg: #f5f3ee;
+  --surface: #ffffff;
+  --surface-2: #faf8f3;
+  --text: #1a1a1a;
+  --text-2: #5a5a55;
+  --text-3: #8a8a85;
+  --border: rgba(0,0,0,0.08);
+  --border-2: rgba(0,0,0,0.16);
+  --accent: #1a4d8c;
+  --accent-bg: #e6f0fb;
+  --ok-bg: #e0efde; --ok-text: #2c5a1c;
+  --warn-bg: #fbecd1; --warn-text: #7a4f08;
+  --bad-bg: #f9d7d7; --bad-text: #802626;
+  --neutral-bg: #ececea; --neutral-text: #555;
+  --paid-bg: #e9e4f5; --paid-text: #463a72;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15161a;
+    --surface: #1f2026;
+    --surface-2: #1a1b20;
+    --text: #ececec;
+    --text-2: #a8a8a8;
+    --text-3: #707070;
+    --border: rgba(255,255,255,0.08);
+    --border-2: rgba(255,255,255,0.16);
+    --accent: #6ba3e0;
+    --accent-bg: #1f3148;
+    --ok-bg: #1e3a18; --ok-text: #b8d6a8;
+    --warn-bg: #4a370d; --warn-text: #f0c98a;
+    --bad-bg: #4d1e1e; --bad-text: #e8a8a8;
+    --neutral-bg: #2a2b31; --neutral-text: #b0b0b0;
+    --paid-bg: #2c2640; --paid-text: #c5b8e8;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+header {
+  position: sticky; top: 0; z-index: 50;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+header h1 {
+  font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em;
+  flex-shrink: 0;
+}
+header h1 .anchor { color: var(--accent); }
+.island-select-wrap { flex: 1; max-width: 380px; }
+select, button, input {
+  font: inherit; color: inherit;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-2);
+  background: var(--surface-2);
+  padding: 8px 12px;
+}
+select { width: 100%; cursor: pointer; }
+button { cursor: pointer; transition: background 0.12s; }
+button:hover { background: var(--bg); }
+main { max-width: 980px; margin: 0 auto; padding: 16px; }
+section { margin: 0 0 24px; }
+.island-info {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.island-info h2 { margin: 0 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+.island-info p { margin: 0; color: var(--text-2); font-size: 14px; }
+
+.fc-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  margin-top: 16px;
+}
+.fc-card {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 10px; text-align: center;
+}
+.fc-card .day { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.fc-card .temp { font-size: 18px; font-weight: 600; }
+.fc-card .row2 { font-size: 12px; color: var(--text-2); margin-top: 4px; line-height: 1.4; }
+.fc-card .row2 strong { color: var(--text); font-weight: 600; }
+.fc-card.now { background: var(--accent-bg); border-color: var(--accent); }
+.fc-card.now .day { color: var(--accent); }
+
+h3 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-2); margin: 0 0 10px; }
+
+.windy-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+}
+.windy-wrap iframe { display: block; width: 100%; height: 380px; border: 0; }
+.windy-credit { position: absolute; bottom: 6px; right: 8px; font-size: 11px; color: rgba(0,0,0,0.5); pointer-events: none; }
+
+.bays { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
+.bay-row {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border);
+  align-items: start;
+}
+.bay-row:last-child { border-bottom: 0; }
+.bay-name { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fav-btn {
+  background: none; border: 0; padding: 2px 4px; cursor: pointer;
+  font-size: 16px; color: var(--text-3); line-height: 1;
+}
+.fav-btn.on { color: #d4a017; }
+.bay-note { font-size: 13px; color: var(--text-2); margin-top: 4px; }
+.pill {
+  display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px;
+  font-weight: 600; white-space: nowrap;
+}
+.pill-overnight { background: var(--ok-bg); color: var(--ok-text); }
+.pill-day { background: var(--warn-bg); color: var(--warn-text); }
+.pill-restricted { background: var(--bad-bg); color: var(--bad-text); }
+.pill-paid { background: var(--paid-bg); color: var(--paid-text); }
+.bay-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.shelter-row { display: flex; gap: 4px; }
+.shelter-cell {
+  min-width: 38px; text-align: center; padding: 4px 6px; border-radius: 6px;
+  font-size: 11px; font-weight: 600; line-height: 1.3;
+}
+.shelter-cell .d { font-size: 9px; opacity: 0.8; display: block; }
+.s-3 { background: var(--ok-bg); color: var(--ok-text); }
+.s-2 { background: var(--accent-bg); color: var(--accent); }
+.s-1 { background: var(--warn-bg); color: var(--warn-text); }
+.s-0 { background: var(--bad-bg); color: var(--bad-text); }
+.s-na { background: var(--neutral-bg); color: var(--neutral-text); }
+
+.btn-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.btn-mini {
+  font-size: 12px; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid var(--border-2); background: transparent;
+  color: var(--text); text-decoration: none; display: inline-block;
+}
+.btn-mini:hover { background: var(--surface-2); }
+
+.tools { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 720px) { .tools { grid-template-columns: 1fr; } }
+.tool-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.tool-card .pickers { display: flex; gap: 8px; margin-bottom: 12px; }
+.tool-card .pickers select { flex: 1; }
+.tool-out {
+  background: var(--surface-2); border-radius: var(--radius);
+  padding: 10px 12px; font-size: 14px; line-height: 1.5;
+}
+.tool-out strong { color: var(--accent); }
+.tide-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.tide-row .when { color: var(--text-2); }
+.tide-row .what { font-variant-numeric: tabular-nums; }
+
+.legend { font-size: 12px; color: var(--text-2); margin-top: 8px; }
+.legend span { display: inline-block; padding: 2px 8px; border-radius: 6px; font-weight: 600; margin: 0 4px 4px 0; }
+
+footer {
+  text-align: center; font-size: 12px; color: var(--text-3);
+  padding: 24px 16px; border-top: 1px solid var(--border); margin-top: 32px;
+}
+footer a { color: var(--text-2); }
+.skel {
+  background: linear-gradient(90deg, var(--neutral-bg) 0%, var(--surface-2) 50%, var(--neutral-bg) 100%);
+  background-size: 200% 100%; animation: skel 1.4s infinite;
+  border-radius: 4px; height: 12px;
+}
+@keyframes skel { 0% { background-position: 0% 0; } 100% { background-position: -200% 0; } }
+.error-banner {
+  background: var(--warn-bg); color: var(--warn-text);
+  padding: 10px 14px; border-radius: var(--radius);
+  font-size: 13px; margin: 8px 0;
+}
+.fav-section { display: none; }
+.fav-section.has-favs { display: block; }
+@media (max-width: 600px) {
+  header { flex-wrap: wrap; }
+  header h1 { font-size: 15px; }
+  main { padding: 12px; }
+  .bay-row { grid-template-columns: 1fr; }
+  .bay-actions { align-items: stretch; }
+  .btn-row { justify-content: flex-start; }
+  .fc-strip { grid-template-columns: repeat(2, 1fr); }
+  .windy-wrap iframe { height: 300px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="anchor">⚓</span> Anchorage Forecast</h1>
+  <div class="island-select-wrap">
+    <select id="island-select" aria-label="Select island"></select>
+  </div>
+</header>
+
+<main>
+  <section class="island-info" id="island-info">
+    <h2 id="island-name">Loading…</h2>
+    <p id="island-note"></p>
+    <div class="fc-strip" id="fc-strip">
+      <div class="fc-card"><div class="skel" style="margin: 8px 0;"></div></div>
+      <div class="fc-card"><div class="skel" style="margin: 8px 0;"></div></div>
+      <div class="fc-card"><div class="skel" style="margin: 8px 0;"></div></div>
+      <div class="fc-card"><div class="skel" style="margin: 8px 0;"></div></div>
+    </div>
+    <div id="fc-error"></div>
+  </section>
+
+  <section class="fav-section" id="fav-section">
+    <h3>★ Favourites</h3>
+    <div class="bays" id="fav-list"></div>
+  </section>
+
+  <section>
+    <h3>Wind map (live, ECMWF)</h3>
+    <div class="windy-wrap">
+      <iframe id="windy-frame" loading="lazy" title="Windy wind map"
+        src="" allow="fullscreen"></iframe>
+    </div>
+  </section>
+
+  <section>
+    <h3>Anchorages — shelter forecast (next 3 days)</h3>
+    <div class="bays" id="bay-list"></div>
+    <div class="legend">
+      Shelter:
+      <span class="s-3">Excellent</span>
+      <span class="s-2">Sheltered</span>
+      <span class="s-1">Marginal</span>
+      <span class="s-0">Exposed</span>
+      <span class="s-na">N/A</span>
+    </div>
+  </section>
+
+  <section class="tools">
+    <div class="tool-card">
+      <h3>Distance &amp; bearing between bays</h3>
+      <div class="pickers">
+        <select id="dist-from" aria-label="From"></select>
+        <select id="dist-to" aria-label="To"></select>
+      </div>
+      <div class="tool-out" id="dist-out">Pick two bays to see the rhumb line.</div>
+    </div>
+    <div class="tool-card">
+      <h3>Tides (next 3 days)</h3>
+      <div class="tool-out" id="tide-out">
+        <em>Aegean tides are typically 10–30 cm and rarely affect anchoring. Shown for completeness in shallow bays.</em>
+      </div>
+      <div id="tide-list" style="margin-top: 10px;"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Data: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (wind, gusts, waves, sea level) ·
+  Map: <a href="https://www.windy.com" target="_blank" rel="noopener">Windy</a> ·
+  Anchorage data curated from cruising guides (2024–2026).
+  <br>This is a planning aid, not a navigation tool. Always verify with official charts and observed conditions.
+</footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
