@@ -387,9 +387,32 @@ function renderWindyMap(overrideLat, overrideLon, zoom) {
   document.getElementById('windy-frame').src = url;
 }
 
+// Set the title shown above the map.
+function setMapTitle(text, bayName) {
+  const el = document.getElementById('map-title');
+  if (!el) return;
+  if (bayName) {
+    el.classList.add('has-bay');
+    el.innerHTML = `<span><span class="pin">📍</span> ${bayName}</span>
+      <button class="reset-btn" id="map-reset-btn">Цял остров</button>`;
+    const rb = document.getElementById('map-reset-btn');
+    if (rb) rb.addEventListener('click', resetMapToIsland);
+  } else {
+    el.classList.remove('has-bay');
+    el.textContent = text || 'Целият остров';
+  }
+}
+
+function resetMapToIsland() {
+  renderWindyMap();  // no override args → island center, default zoom
+  const isl = ISLANDS[STATE.islandKey];
+  setMapTitle(`Целият остров — ${isl.name}`, null);
+}
+
 // Focus the embedded Windy map on a specific bay and scroll to it.
 function focusBayOnMap(bay) {
   renderWindyMap(bay.lat, bay.lng, 13);
+  setMapTitle(null, bay.name);
   const wrap = document.querySelector('.windy-wrap');
   if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -628,6 +651,7 @@ function renderTides() {
 async function loadIsland() {
   renderIslandHeader();
   renderWindyMap();
+  setMapTitle(`Целият остров — ${ISLANDS[STATE.islandKey].name}`, null);
   // Show skeletons
   document.getElementById('fc-strip').innerHTML =
     '<div class="fc-card"><div class="skel"></div></div>'.repeat(4);

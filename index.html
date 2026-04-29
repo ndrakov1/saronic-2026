@@ -112,6 +112,23 @@ h3 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacin
 }
 .windy-wrap iframe { display: block; width: 100%; height: 380px; border: 0; }
 .windy-credit { position: absolute; bottom: 6px; right: 8px; font-size: 11px; color: rgba(0,0,0,0.5); pointer-events: none; }
+.map-title {
+  display: flex; align-items: center; justify-content: space-between;
+  background: var(--surface); border: 1px solid var(--border);
+  border-bottom: 0; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 10px 14px; font-size: 14px; font-weight: 600;
+  color: var(--text); margin-bottom: -1px;
+}
+.map-title.has-bay { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
+.map-title .reset-btn {
+  font-size: 12px; font-weight: 500; padding: 4px 10px;
+  border: 1px solid var(--border-2); background: transparent;
+  border-radius: var(--radius); color: var(--text-2); cursor: pointer;
+}
+.map-title .reset-btn:hover { background: var(--surface-2); color: var(--text); }
+.map-title.has-bay .reset-btn { border-color: var(--accent); color: var(--accent); }
+.map-title .pin { font-size: 14px; }
+.windy-wrap { border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
 
 .bays { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
 .bay-row {
@@ -248,6 +265,7 @@ footer a { color: var(--text-2); }
 
   <section>
     <h3>Карта на вятъра (на живо, ECMWF)</h3>
+    <div class="map-title" id="map-title">Целият остров</div>
     <div class="windy-wrap">
       <iframe id="windy-frame" loading="lazy" title="Карта на вятъра от Windy"
         src="" allow="fullscreen"></iframe>
