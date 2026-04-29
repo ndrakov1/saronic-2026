@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bg">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Free anchorage and overnight mooring forecast for Greek islands — Saronic Gulf and Cyclades. Wind, gusts, wave shelter scoring per bay, 3-day forecast, tides, distance tool. No login.">
-<title>Greek Islands · Anchorage Forecast</title>
+<meta name="description" content="Безплатен инструмент за планиране на закотвяне в гръцките острови — Сароничен залив и Циклади. Прогноза за вятър, пориви, вълнение, оценка на защитата по заливи.">
+<title>Гръцки острови · Прогноза за закотвяне</title>
 <style>
 :root {
   --bg: #f5f3ee;
@@ -222,15 +222,15 @@ footer a { color: var(--text-2); }
 </head>
 <body>
 <header>
-  <h1><span class="anchor">⚓</span> Anchorage Forecast</h1>
+  <h1><span class="anchor">⚓</span> Прогноза за закотвяне</h1>
   <div class="island-select-wrap">
-    <select id="island-select" aria-label="Select island"></select>
+    <select id="island-select" aria-label="Изберете остров"></select>
   </div>
 </header>
 
 <main>
   <section class="island-info" id="island-info">
-    <h2 id="island-name">Loading…</h2>
+    <h2 id="island-name">Зареждане…</h2>
     <p id="island-note"></p>
     <div class="fc-strip" id="fc-strip">
       <div class="fc-card"><div class="skel" style="margin: 8px 0;"></div></div>
@@ -242,46 +242,46 @@ footer a { color: var(--text-2); }
   </section>
 
   <section class="fav-section" id="fav-section">
-    <h3>★ Favourites</h3>
+    <h3>★ Любими</h3>
     <div class="bays" id="fav-list"></div>
   </section>
 
   <section>
-    <h3>Wind map (live, ECMWF)</h3>
+    <h3>Карта на вятъра (на живо, ECMWF)</h3>
     <div class="windy-wrap">
-      <iframe id="windy-frame" loading="lazy" title="Windy wind map"
+      <iframe id="windy-frame" loading="lazy" title="Карта на вятъра от Windy"
         src="" allow="fullscreen"></iframe>
     </div>
-    <div class="windy-hint">Tap "Show on map" on any bay below to re-center this map on it.</div>
+    <div class="windy-hint">Натиснете „Покажи на картата" на който и да е залив, за да центрирате картата върху него.</div>
   </section>
 
   <section>
-    <h3>Anchorages — shelter forecast (next 3 days)</h3>
+    <h3>Заливи — прогноза за защита (следващи 3 дни)</h3>
     <div id="ais-info-banner"></div>
     <div class="bays" id="bay-list"></div>
     <div class="legend">
-      Shelter:
-      <span class="s-3">Excellent</span>
-      <span class="s-2">Sheltered</span>
-      <span class="s-1">Marginal</span>
-      <span class="s-0">Exposed</span>
-      <span class="s-na">N/A</span>
+      Защита:
+      <span class="s-3">Отлична</span>
+      <span class="s-2">Защитен</span>
+      <span class="s-1">Гранична</span>
+      <span class="s-0">Незащитен</span>
+      <span class="s-na">Няма данни</span>
     </div>
   </section>
 
   <section class="tools">
     <div class="tool-card">
-      <h3>Distance &amp; bearing between bays</h3>
+      <h3>Разстояние и пеленг между заливи</h3>
       <div class="pickers">
-        <select id="dist-from" aria-label="From"></select>
-        <select id="dist-to" aria-label="To"></select>
+        <select id="dist-from" aria-label="От"></select>
+        <select id="dist-to" aria-label="До"></select>
       </div>
-      <div class="tool-out" id="dist-out">Pick two bays to see the rhumb line.</div>
+      <div class="tool-out" id="dist-out">Изберете два залива, за да видите разстоянието и курса.</div>
     </div>
     <div class="tool-card">
-      <h3>Tides (next 3 days)</h3>
+      <h3>Приливи (следващи 3 дни)</h3>
       <div class="tool-out" id="tide-out">
-        <em>Aegean tides are typically 10–30 cm and rarely affect anchoring. Shown for completeness in shallow bays.</em>
+        <em>Приливите в Егейско море са обикновено 10–30 cm и рядко влияят върху закотвянето. Показани за пълнота при плитки заливи.</em>
       </div>
       <div id="tide-list" style="margin-top: 10px;"></div>
     </div>
@@ -289,10 +289,10 @@ footer a { color: var(--text-2); }
 </main>
 
 <footer>
-  Data: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (wind, gusts, waves, sea level) ·
-  Map: <a href="https://www.windy.com" target="_blank" rel="noopener">Windy</a> ·
-  Anchorage data curated from cruising guides (2024–2026).
-  <br>This is a planning aid, not a navigation tool. Always verify with official charts and observed conditions.
+  Данни: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (вятър, пориви, вълнение, ниво на морето) ·
+  Кораби на живо: <a href="https://aisstream.io" target="_blank" rel="noopener">AISStream</a> ·
+  Карта: <a href="https://www.windy.com" target="_blank" rel="noopener">Windy</a>
+  <br>Това е помощно средство за планиране, не навигационен инструмент. Винаги проверявайте с официални карти и наблюдаваните условия.
 </footer>
 
 <script src="data.js"></script>

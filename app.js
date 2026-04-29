@@ -36,19 +36,19 @@ function distanceMetres(lat1, lon1, lat2, lon2) {
 // Map AIS ship-type integer codes to a coarse human label.
 // https://api.vtexplorer.com/docs/ref-aistypes.html
 function shipTypeLabel(code) {
-  if (code == null) return 'vessel';
+  if (code == null) return 'кораб';
   const c = +code;
-  if (c >= 60 && c <= 69) return 'passenger / ferry';
-  if (c >= 70 && c <= 79) return 'cargo';
-  if (c >= 80 && c <= 89) return 'tanker';
-  if (c === 30) return 'fishing';
-  if (c === 36 || c === 37) return 'yacht';
-  if (c >= 40 && c <= 49) return 'high-speed craft';
-  if (c === 50) return 'pilot';
-  if (c === 51) return 'SAR';
-  if (c === 52) return 'tug';
-  if (c === 55) return 'law enforcement';
-  return 'vessel';
+  if (c >= 60 && c <= 69) return 'пътнически/ферибот';
+  if (c >= 70 && c <= 79) return 'товарен';
+  if (c >= 80 && c <= 89) return 'танкер';
+  if (c === 30) return 'риболовен';
+  if (c === 36 || c === 37) return 'яхта';
+  if (c >= 40 && c <= 49) return 'високоскоростен';
+  if (c === 50) return 'пилотен';
+  if (c === 51) return 'спасителен';
+  if (c === 52) return 'влекач';
+  if (c === 55) return 'полицейски';
+  return 'кораб';
 }
 
 function disconnectAis() {
@@ -160,10 +160,10 @@ function vesselsAtBay(bay) {
 function formatAgo(ts) {
   if (!ts) return null;
   const sec = Math.round((Date.now() - ts) / 1000);
-  if (sec < 30) return 'just now';
-  if (sec < 90) return '1 min ago';
-  if (sec < 3600) return `${Math.round(sec/60)} min ago`;
-  return `${Math.round(sec/3600)} h ago`;
+  if (sec < 30) return 'току-що';
+  if (sec < 90) return 'преди 1 мин';
+  if (sec < 3600) return `преди ${Math.round(sec/60)} мин`;
+  return `преди ${Math.round(sec/3600)} ч`;
 }
 
 // Build the small inline string shown next to a bay row.
@@ -172,13 +172,13 @@ function vesselBadgeHtml(bay) {
   if (v == null) return ''; // AIS disabled — show nothing
 
   if (STATE.aisStatus === 'connecting') {
-    return `<div class="ais-badge ais-pending">🛥 scanning…</div>`;
+    return `<div class="ais-badge ais-pending">🛥 сканиране…</div>`;
   }
   if (STATE.aisStatus === 'error') {
-    return `<div class="ais-badge ais-err">🛥 AIS unavailable</div>`;
+    return `<div class="ais-badge ais-err">🛥 AIS недостъпен</div>`;
   }
   if (v.count === 0) {
-    return `<div class="ais-badge ais-empty">🛥 0 vessels</div>`;
+    return `<div class="ais-badge ais-empty">🛥 0 кораба</div>`;
   }
   const ago = formatAgo(v.mostRecent);
   const breakdown = Object.entries(v.types)
@@ -186,7 +186,7 @@ function vesselBadgeHtml(bay) {
     .slice(0, 2)
     .map(([t, n]) => `${n} ${t}`)
     .join(', ');
-  return `<div class="ais-badge ais-on" title="${breakdown}">🛥 ${v.count} · last seen ${ago}</div>`;
+  return `<div class="ais-badge ais-on" title="${breakdown}">🛥 ${v.count} · ${ago}</div>`;
 }
 
 // ─── Compass helpers ──────────────────────────────────────────────────────
@@ -202,6 +202,10 @@ function compassDistance(a, b) {
   let d = Math.abs(ia - ib);
   return d > 4 ? 8 - d : d;
 }
+
+// Bulgarian compass labels
+const COMPASS_BG = { N: 'С', NE: 'СИ', E: 'И', SE: 'ЮИ', S: 'Ю', SW: 'ЮЗ', W: 'З', NW: 'СЗ' };
+function compassBG(c) { return COMPASS_BG[c] || c || ''; }
 
 // ─── Shelter scoring ──────────────────────────────────────────────────────
 // 0 = exposed, 1 = marginal, 2 = sheltered, 3 = excellent, null = N/A
@@ -237,10 +241,10 @@ function shelterScore(bay, windDir, windKn, gustKn, waveM) {
 function shelterLabel(s) {
   if (s == null) return { txt: '—', cls: 's-na' };
   return [
-    { txt: 'Exposed',   cls: 's-0' },
-    { txt: 'Marginal',  cls: 's-1' },
-    { txt: 'Sheltered', cls: 's-2' },
-    { txt: 'Excellent', cls: 's-3' }
+    { txt: 'Незащитен', cls: 's-0' },
+    { txt: 'Гранична',  cls: 's-1' },
+    { txt: 'Защитен',   cls: 's-2' },
+    { txt: 'Отлична',   cls: 's-3' }
   ][s];
 }
 
@@ -269,7 +273,7 @@ async function fetchForecast(lat, lon) {
     `&current=temperature_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
     `&forecast_days=4&wind_speed_unit=kn&timezone=auto`;
   const r = await fetch(url);
-  if (!r.ok) throw new Error('Forecast unavailable');
+  if (!r.ok) throw new Error('Прогнозата е недостъпна');
   return await r.json();
 }
 async function fetchMarine(lat, lon) {
@@ -278,7 +282,7 @@ async function fetchMarine(lat, lon) {
     `&hourly=wave_height,sea_level_height_msl` +
     `&forecast_days=4&timezone=auto`;
   const r = await fetch(url);
-  if (!r.ok) throw new Error('Marine forecast unavailable');
+  if (!r.ok) throw new Error('Морската прогноза е недостъпна');
   return await r.json();
 }
 
@@ -290,7 +294,7 @@ function extractTides(times, levels) {
     if (levels[i] == null || levels[i-1] == null || levels[i+1] == null) continue;
     const isHigh = levels[i] > levels[i-1] && levels[i] > levels[i+1];
     const isLow  = levels[i] < levels[i-1] && levels[i] < levels[i+1];
-    if (isHigh || isLow) out.push({ time: times[i], level: levels[i], type: isHigh ? 'High' : 'Low' });
+    if (isHigh || isLow) out.push({ time: times[i], level: levels[i], type: isHigh ? 'Прилив' : 'Отлив' });
   }
   return out;
 }
@@ -330,13 +334,13 @@ function renderIslandHeader() {
 function renderForecastStrip() {
   const el = document.getElementById('fc-strip');
   const fc = STATE.forecast, mar = STATE.marine;
-  if (!fc) { el.innerHTML = '<div class="error-banner">Forecast unavailable. Check connection and reload.</div>'; return; }
+  if (!fc) { el.innerHTML = '<div class="error-banner">Прогнозата е недостъпна. Проверете връзката и презаредете.</div>'; return; }
 
   const cards = [];
   // Now card
   const cur = fc.current || {};
   cards.push({
-    label: 'Now',
+    label: 'Сега',
     temp: cur.temperature_2m,
     wind: cur.wind_speed_10m,
     gust: cur.wind_gusts_10m,
@@ -347,7 +351,7 @@ function renderForecastStrip() {
   for (let i = 0; i < 3; i++) {
     const d = new Date(fc.daily.time[i]);
     cards.push({
-      label: d.toLocaleDateString(undefined, { weekday: 'short' }),
+      label: d.toLocaleDateString('bg-BG', { weekday: 'short' }),
       temp: fc.daily.temperature_2m_max[i],
       wind: fc.daily.wind_speed_10m_max[i],
       gust: fc.daily.wind_gusts_10m_max[i],
@@ -361,10 +365,10 @@ function renderForecastStrip() {
       <div class="day">${c.label}</div>
       <div class="temp">${c.temp != null ? Math.round(c.temp) + '°' : '—'}</div>
       <div class="row2">
-        <strong>${c.wind != null ? Math.round(c.wind) : '—'} kn</strong> ${c.dir || ''}<br>
-        Gust ${c.gust != null ? Math.round(c.gust) : '—'} kn<br>
-        ${c.wave != null ? 'Sea ' + c.wave.toFixed(1) + ' m' : ''}
-        ${c.precip != null ? ' · ' + c.precip + '% rain' : ''}
+        <strong>${c.wind != null ? Math.round(c.wind) : '—'} възли</strong> ${compassBG(c.dir)}<br>
+        Пориви ${c.gust != null ? Math.round(c.gust) : '—'} възли<br>
+        ${c.wave != null ? 'Вълни ' + c.wave.toFixed(1) + ' м' : ''}
+        ${c.precip != null ? ' · ' + c.precip + '% дъжд' : ''}
       </div>
     </div>
   `).join('');
@@ -409,10 +413,10 @@ function dayShelterFor(bay, dayIdx) {
 
 function statusPillHtml(status) {
   const map = {
-    overnight: { txt: 'Overnight OK', cls: 'pill-overnight' },
-    day:       { txt: 'Day only',     cls: 'pill-day' },
-    restricted:{ txt: 'Restricted',   cls: 'pill-restricted' },
-    paid:      { txt: 'Paid berth',   cls: 'pill-paid' }
+    overnight: { txt: 'Нощуване ОК',    cls: 'pill-overnight' },
+    day:       { txt: 'Само ден',       cls: 'pill-day' },
+    restricted:{ txt: 'Забранено',      cls: 'pill-restricted' },
+    paid:      { txt: 'Платен пристан', cls: 'pill-paid' }
   };
   const m = map[status] || map.day;
   return `<span class="pill ${m.cls}">${m.txt}</span>`;
@@ -432,7 +436,7 @@ function toggleFavorite(islandKey, bayName) {
 
 function renderBayRow(bay, islandKey) {
   const fc = STATE.forecast;
-  const dayLabels = fc ? [0, 1, 2].map(i => new Date(fc.daily.time[i]).toLocaleDateString(undefined, { weekday: 'short' })) : ['', '', ''];
+  const dayLabels = fc ? [0, 1, 2].map(i => new Date(fc.daily.time[i]).toLocaleDateString('bg-BG', { weekday: 'short' })) : ['', '', ''];
   const cells = [0, 1, 2].map(i => {
     const s = dayShelterFor(bay, i);
     const lbl = shelterLabel(s);
@@ -445,7 +449,7 @@ function renderBayRow(bay, islandKey) {
     <div class="bay-row" data-bay-key="${bayKey}">
       <div>
         <div class="bay-name">
-          <button class="fav-btn ${fav ? 'on' : ''}" data-island="${islandKey}" data-bay="${bay.name.replace(/"/g, '&quot;')}" aria-label="Toggle favourite" title="Favourite">${fav ? '★' : '☆'}</button>
+          <button class="fav-btn ${fav ? 'on' : ''}" data-island="${islandKey}" data-bay="${bay.name.replace(/"/g, '&quot;')}" aria-label="Превключване на любим" title="Любим">${fav ? '★' : '☆'}</button>
           ${bay.name}
           ${statusPillHtml(bay.status)}
         </div>
@@ -455,8 +459,8 @@ function renderBayRow(bay, islandKey) {
         <div class="shelter-row">${cells}</div>
         ${vesselBadgeHtml(bay)}
         <div class="btn-row">
-          <button class="btn-mini btn-windy" data-lat="${bay.lat}" data-lng="${bay.lng}" data-name="${bay.name.replace(/"/g, '&quot;')}" data-island="${islandKey}">Show on map ↑</button>
-          <a class="btn-mini" href="${gMapsUrl}" target="_blank" rel="noopener">Maps ↗</a>
+          <button class="btn-mini btn-windy" data-lat="${bay.lat}" data-lng="${bay.lng}" data-name="${bay.name.replace(/"/g, '&quot;')}" data-island="${islandKey}">Покажи на картата ↑</button>
+          <a class="btn-mini" href="${gMapsUrl}" target="_blank" rel="noopener">Карта ↗</a>
         </div>
       </div>
     </div>`;
@@ -466,9 +470,9 @@ function renderAisInfoBanner() {
   const el = document.getElementById('ais-info-banner');
   if (!el) return;
   if (STATE.aisStatus === 'disabled') {
-    el.innerHTML = `<div class="ais-info">🛥 Live vessel counts are disabled. Add a free <a href="https://aisstream.io/authenticate" target="_blank" rel="noopener">AISStream.io</a> API key to <code>data.js</code> to enable them.</div>`;
+    el.innerHTML = `<div class="ais-info">🛥 Броячът на кораби на живо е изключен. Добавете безплатен <a href="https://aisstream.io/authenticate" target="_blank" rel="noopener">AISStream.io</a> API ключ в <code>data.js</code> за да го активирате.</div>`;
   } else if (STATE.aisStatus === 'streaming' || STATE.aisStatus === 'connecting') {
-    el.innerHTML = `<div class="ais-info">🛥 <strong>Live vessel counts</strong> show only AIS-equipped boats — typically ferries, mega-yachts, cargo, and most charter cats. Smaller monohulls and tenders are invisible to AIS.</div>`;
+    el.innerHTML = `<div class="ais-info">🛥 <strong>Броячът на кораби на живо</strong> показва само плавателни съдове с AIS — обикновено ферибот, мегаяхти, товарни и повечето чартърни катамарани. По-малки яхти и тендери не се виждат на AIS.</div>`;
   } else {
     el.innerHTML = '';
   }
@@ -513,18 +517,18 @@ function renderFavorites() {
       if (!sameIsland) return `<div class="shelter-cell s-na">—</div>`;
       const s = dayShelterFor(bay, i);
       const lbl = shelterLabel(s);
-      const dayLabel = STATE.forecast ? new Date(STATE.forecast.daily.time[i]).toLocaleDateString(undefined, { weekday: 'short' }) : '';
+      const dayLabel = STATE.forecast ? new Date(STATE.forecast.daily.time[i]).toLocaleDateString('bg-BG', { weekday: 'short' }) : '';
       return `<div class="shelter-cell ${lbl.cls}"><span class="d">${dayLabel}</span>${lbl.txt}</div>`;
     }).join('');
     const bayKey = `${island}::${name}`.replace(/[^a-zA-Z0-9_:]/g, '_');
     const showOnMapBtn = sameIsland
-      ? `<button class="btn-mini btn-windy" data-lat="${bay.lat}" data-lng="${bay.lng}" data-name="${name.replace(/"/g, '&quot;')}" data-island="${island}">Show on map ↑</button>`
-      : `<button class="btn-mini" data-go="${island}">Switch to ${isl.name} ↗</button>`;
+      ? `<button class="btn-mini btn-windy" data-lat="${bay.lat}" data-lng="${bay.lng}" data-name="${name.replace(/"/g, '&quot;')}" data-island="${island}">Покажи на картата ↑</button>`
+      : `<button class="btn-mini" data-go="${island}">Към ${isl.name} ↗</button>`;
     return `
       <div class="bay-row" data-bay-key="${bayKey}">
         <div>
           <div class="bay-name">
-            <button class="fav-btn on" data-island="${island}" data-bay="${name.replace(/"/g, '&quot;')}" title="Remove from favourites">★</button>
+            <button class="fav-btn on" data-island="${island}" data-bay="${name.replace(/"/g, '&quot;')}" title="Премахване от любими">★</button>
             ${name} <span class="pill pill-paid">${isl.name}</span>
             ${statusPillHtml(bay.status)}
           </div>
@@ -532,6 +536,7 @@ function renderFavorites() {
         </div>
         <div class="bay-actions">
           <div class="shelter-row">${cells}</div>
+          ${sameIsland ? vesselBadgeHtml(bay) : ''}
           <div class="btn-row">
             ${showOnMapBtn}
           </div>
@@ -566,14 +571,14 @@ function renderDistanceTool() {
   const opts = isl.anchorages.map((b, i) => `<option value="${i}">${b.name}</option>`).join('');
   const sFrom = document.getElementById('dist-from');
   const sTo = document.getElementById('dist-to');
-  sFrom.innerHTML = '<option value="">— from —</option>' + opts;
-  sTo.innerHTML = '<option value="">— to —</option>' + opts;
+  sFrom.innerHTML = '<option value="">— от —</option>' + opts;
+  sTo.innerHTML = '<option value="">— до —</option>' + opts;
 
   const update = () => {
     const i1 = sFrom.value, i2 = sTo.value;
     const out = document.getElementById('dist-out');
     if (i1 === '' || i2 === '' || i1 === i2) {
-      out.innerHTML = 'Pick two different bays to see the rhumb line.';
+      out.innerHTML = 'Изберете два различни залива, за да видите разстоянието и курса.';
       return;
     }
     const a = isl.anchorages[+i1], b = isl.anchorages[+i2];
@@ -583,9 +588,9 @@ function renderDistanceTool() {
     const km = nm * 1.852;
     const t5 = (nm / 5).toFixed(1);   // hours at 5 kn
     out.innerHTML = `
-      <strong>${nm.toFixed(2)} nm</strong> (${km.toFixed(2)} km)<br>
-      Bearing <strong>${Math.round(brg)}°</strong> (${compass})<br>
-      ETA at 5 kn: ${t5} h · at 7 kn: ${(nm/7).toFixed(1)} h
+      <strong>${nm.toFixed(2)} мили</strong> (${km.toFixed(2)} км)<br>
+      Пеленг <strong>${Math.round(brg)}°</strong> (${compassBG(compass)})<br>
+      Време при 5 възела: ${t5} ч · при 7 възела: ${(nm/7).toFixed(1)} ч
     `;
   };
   sFrom.onchange = sTo.onchange = update;
@@ -597,26 +602,25 @@ function renderTides() {
   out.innerHTML = '';
   const m = STATE.marine;
   if (!m || !m.hourly || !m.hourly.sea_level_height_msl) {
-    out.innerHTML = '<em>Tide data unavailable for this location.</em>';
+    out.innerHTML = '<em>Няма данни за приливи на това място.</em>';
     return;
   }
   const tides = extractTides(m.hourly.time, m.hourly.sea_level_height_msl);
   if (tides.length === 0) {
-    out.innerHTML = '<em>Tide range below noise threshold (typical for the Aegean).</em>';
+    out.innerHTML = '<em>Амплитудата на приливите е под прага (типично за Егейско море).</em>';
     return;
   }
-  // Take next 6 events (≈ 3 days worth of high/low)
   const now = new Date();
   const upcoming = tides.filter(t => new Date(t.time) >= now).slice(0, 6);
   if (upcoming.length === 0) {
-    out.innerHTML = '<em>No upcoming tide extrema in forecast window.</em>';
+    out.innerHTML = '<em>Няма предстоящи приливни екстремуми в прогнозния прозорец.</em>';
     return;
   }
   out.innerHTML = upcoming.map(t => {
     const dt = new Date(t.time);
-    const when = dt.toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    const when = dt.toLocaleString('bg-BG', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
     const lvl = t.level >= 0 ? '+' + (t.level * 100).toFixed(0) : (t.level * 100).toFixed(0);
-    return `<div class="tide-row"><span class="when">${when}</span><span class="what"><strong>${t.type}</strong> ${lvl} cm</span></div>`;
+    return `<div class="tide-row"><span class="when">${when}</span><span class="what"><strong>${t.type}</strong> ${lvl} см</span></div>`;
   }).join('');
 }
 
@@ -640,7 +644,7 @@ async function loadIsland() {
     STATE.marine = mar;
   } catch (err) {
     document.getElementById('fc-error').innerHTML =
-      `<div class="error-banner">Forecast couldn't load (${err.message}). Anchorage data still available.</div>`;
+      `<div class="error-banner">Прогнозата не можа да се зареди (${err.message}). Данните за заливите все още са налични.</div>`;
     STATE.forecast = null; STATE.marine = null;
   }
 
