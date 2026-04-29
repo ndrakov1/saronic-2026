@@ -5,6 +5,20 @@
 //        Use '-' for landlocked or restricted spots.
 // Notes are condensed from cruising guides 2024–2026.
 
+// ─── AIS Stream API key ───────────────────────────────────────────────────
+// Free signup at https://aisstream.io/authenticate (takes ~30 seconds).
+// Paste your key below. If left empty, the live-vessels feature is disabled
+// and the rest of the tool works normally.
+const AIS_API_KEY = "5fbe2b3b51691759cd9260fed79ffa920d29b935";  // ← paste your AISStream API key here
+
+// Default radius (metres) used to count vessels around each bay.
+// You can override per bay by adding `radius_m: 1500` to the bay entry.
+const AIS_DEFAULT_RADIUS_M = 800;
+
+// A vessel must have last broadcast within this many minutes to still count
+// as "here". Stationary boats broadcast every 3–6 minutes, so 10 is generous.
+const AIS_FRESHNESS_MINUTES = 10;
+
 const ISLANDS = {
 
   mykonos: {

@@ -195,6 +195,19 @@ footer a { color: var(--text-2); }
 }
 .fav-section { display: none; }
 .fav-section.has-favs { display: block; }
+.windy-hint { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+.ais-badge {
+  font-size: 11px; padding: 3px 8px; border-radius: 6px;
+  font-weight: 500; white-space: nowrap; align-self: flex-end;
+}
+.ais-badge.ais-on { background: var(--accent-bg); color: var(--accent); }
+.ais-badge.ais-empty { background: var(--neutral-bg); color: var(--text-3); }
+.ais-badge.ais-pending { background: var(--neutral-bg); color: var(--text-3); font-style: italic; }
+.ais-badge.ais-err { background: var(--bad-bg); color: var(--bad-text); }
+.ais-info {
+  background: var(--accent-bg); color: var(--accent); padding: 8px 12px;
+  border-radius: var(--radius); font-size: 12px; margin: 8px 0;
+}
 @media (max-width: 600px) {
   header { flex-wrap: wrap; }
   header h1 { font-size: 15px; }
@@ -239,10 +252,12 @@ footer a { color: var(--text-2); }
       <iframe id="windy-frame" loading="lazy" title="Windy wind map"
         src="" allow="fullscreen"></iframe>
     </div>
+    <div class="windy-hint">Tap "Show on map" on any bay below to re-center this map on it.</div>
   </section>
 
   <section>
     <h3>Anchorages — shelter forecast (next 3 days)</h3>
+    <div id="ais-info-banner"></div>
     <div class="bays" id="bay-list"></div>
     <div class="legend">
       Shelter:

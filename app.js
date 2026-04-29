@@ -1,6 +1,7 @@
 // app.js — Greek Islands Anchorage Forecast
 // Pulls forecast from Open-Meteo (no API key), embeds Windy iframe,
 // scores shelter per bay using wind+gusts+wave+direction.
+// AIS Stream WebSocket (optional) gives live vessel counts per bay.
 
 const STATE = {
   islandKey: localStorage.getItem('island') || 'mykonos',
@@ -8,7 +9,185 @@ const STATE = {
   marine: null,        // daily marine forecast
   tides: null,         // hourly sea-level series
   favorites: JSON.parse(localStorage.getItem('favorites') || '[]'), // [{island, name}]
+  vessels: new Map(),  // MMSI → {lat, lon, name, type, lastSeen, course, speed}
+  aisSocket: null,     // current WebSocket
+  aisStatus: 'idle',   // idle | connecting | streaming | error | disabled
 };
+
+// ─── AIS Stream (live vessel counts) ──────────────────────────────────────
+
+// Compute a bounding box (south, west, north, east) covering an island
+// out to ~15 km from its centre — enough to include all anchorages.
+function islandBbox([lat, lon]) {
+  const dLat = 0.15;            // ~16 km
+  const dLon = 0.18 / Math.cos(lat * Math.PI / 180);  // ~16 km at given lat
+  return [lat - dLat, lon - dLon, lat + dLat, lon + dLon];
+}
+
+// Haversine in metres for the AIS distance check.
+function distanceMetres(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+// Map AIS ship-type integer codes to a coarse human label.
+// https://api.vtexplorer.com/docs/ref-aistypes.html
+function shipTypeLabel(code) {
+  if (code == null) return 'vessel';
+  const c = +code;
+  if (c >= 60 && c <= 69) return 'passenger / ferry';
+  if (c >= 70 && c <= 79) return 'cargo';
+  if (c >= 80 && c <= 89) return 'tanker';
+  if (c === 30) return 'fishing';
+  if (c === 36 || c === 37) return 'yacht';
+  if (c >= 40 && c <= 49) return 'high-speed craft';
+  if (c === 50) return 'pilot';
+  if (c === 51) return 'SAR';
+  if (c === 52) return 'tug';
+  if (c === 55) return 'law enforcement';
+  return 'vessel';
+}
+
+function disconnectAis() {
+  if (STATE.aisSocket) {
+    try { STATE.aisSocket.close(); } catch (_) {}
+    STATE.aisSocket = null;
+  }
+}
+
+function connectAisForIsland(islandKey) {
+  disconnectAis();
+  STATE.vessels.clear();
+
+  if (!AIS_API_KEY) {
+    STATE.aisStatus = 'disabled';
+    renderBays();  // re-render to show "AIS off" state
+    return;
+  }
+
+  const isl = ISLANDS[islandKey];
+  const bbox = islandBbox(isl.center);  // [s, w, n, e]
+  STATE.aisStatus = 'connecting';
+
+  let ws;
+  try {
+    ws = new WebSocket('wss://stream.aisstream.io/v0/stream');
+  } catch (e) {
+    STATE.aisStatus = 'error';
+    return;
+  }
+  STATE.aisSocket = ws;
+
+  ws.onopen = () => {
+    // Subscribe to all position-related messages in our bbox.
+    // AISStream expects bbox as [[[lat_min, lon_min], [lat_max, lon_max]]].
+    const sub = {
+      APIKey: AIS_API_KEY,
+      BoundingBoxes: [[[bbox[0], bbox[1]], [bbox[2], bbox[3]]]],
+      FilterMessageTypes: ['PositionReport', 'ShipStaticData']
+    };
+    ws.send(JSON.stringify(sub));
+    STATE.aisStatus = 'streaming';
+    renderBays();
+  };
+
+  ws.onmessage = ev => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch (_) { return; }
+    const meta = msg.MetaData || {};
+    const mmsi = meta.MMSI;
+    if (!mmsi) return;
+
+    const existing = STATE.vessels.get(mmsi) || {};
+    const updated = { ...existing, lastSeen: Date.now() };
+
+    if (msg.MessageType === 'PositionReport' && msg.Message?.PositionReport) {
+      const p = msg.Message.PositionReport;
+      updated.lat = p.Latitude;
+      updated.lon = p.Longitude;
+      updated.speed = p.Sog;
+      updated.course = p.Cog;
+      updated.name = updated.name || (meta.ShipName || '').trim();
+    } else if (msg.MessageType === 'ShipStaticData' && msg.Message?.ShipStaticData) {
+      const s = msg.Message.ShipStaticData;
+      updated.type = s.Type;
+      updated.name = (s.Name || meta.ShipName || updated.name || '').trim();
+    } else {
+      return;
+    }
+    STATE.vessels.set(mmsi, updated);
+  };
+
+  ws.onerror = () => { STATE.aisStatus = 'error'; renderBays(); };
+  ws.onclose = () => {
+    if (STATE.aisStatus === 'streaming') STATE.aisStatus = 'idle';
+  };
+
+  // Re-render bays every 15 seconds to refresh counts and "last seen" labels.
+  if (window._aisTimer) clearInterval(window._aisTimer);
+  window._aisTimer = setInterval(() => {
+    if (STATE.aisStatus === 'streaming' || STATE.aisStatus === 'connecting') {
+      renderBays();
+    }
+  }, 15000);
+}
+
+// Count vessels currently within a bay's radius and last seen recently.
+function vesselsAtBay(bay) {
+  if (STATE.aisStatus === 'disabled') return null;
+  const radius = bay.radius_m || AIS_DEFAULT_RADIUS_M;
+  const cutoff = Date.now() - AIS_FRESHNESS_MINUTES * 60 * 1000;
+  let count = 0;
+  let mostRecent = 0;
+  const types = {};
+  for (const v of STATE.vessels.values()) {
+    if (v.lat == null || v.lon == null) continue;
+    if (v.lastSeen < cutoff) continue;
+    const d = distanceMetres(bay.lat, bay.lng, v.lat, v.lon);
+    if (d > radius) continue;
+    count++;
+    if (v.lastSeen > mostRecent) mostRecent = v.lastSeen;
+    const t = shipTypeLabel(v.type);
+    types[t] = (types[t] || 0) + 1;
+  }
+  return { count, mostRecent, types };
+}
+
+// Format "last seen 2 min ago" / "just now" / etc.
+function formatAgo(ts) {
+  if (!ts) return null;
+  const sec = Math.round((Date.now() - ts) / 1000);
+  if (sec < 30) return 'just now';
+  if (sec < 90) return '1 min ago';
+  if (sec < 3600) return `${Math.round(sec/60)} min ago`;
+  return `${Math.round(sec/3600)} h ago`;
+}
+
+// Build the small inline string shown next to a bay row.
+function vesselBadgeHtml(bay) {
+  const v = vesselsAtBay(bay);
+  if (v == null) return ''; // AIS disabled — show nothing
+
+  if (STATE.aisStatus === 'connecting') {
+    return `<div class="ais-badge ais-pending">🛥 scanning…</div>`;
+  }
+  if (STATE.aisStatus === 'error') {
+    return `<div class="ais-badge ais-err">🛥 AIS unavailable</div>`;
+  }
+  if (v.count === 0) {
+    return `<div class="ais-badge ais-empty">🛥 0 vessels</div>`;
+  }
+  const ago = formatAgo(v.mostRecent);
+  const breakdown = Object.entries(v.types)
+    .sort((a,b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([t, n]) => `${n} ${t}`)
+    .join(', ');
+  return `<div class="ais-badge ais-on" title="${breakdown}">🛥 ${v.count} · last seen ${ago}</div>`;
+}
 
 // ─── Compass helpers ──────────────────────────────────────────────────────
 function degToCompass(deg) {
@@ -191,14 +370,24 @@ function renderForecastStrip() {
   `).join('');
 }
 
-function renderWindyMap() {
+function renderWindyMap(overrideLat, overrideLon, zoom) {
   const isl = ISLANDS[STATE.islandKey];
-  const [lat, lon] = isl.center;
+  const [lat, lon] = (overrideLat != null && overrideLon != null)
+    ? [overrideLat, overrideLon]
+    : isl.center;
+  const z = zoom || (overrideLat != null ? 13 : 11);
   const url = `https://embed.windy.com/embed2.html?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}` +
-    `&width=650&height=450&zoom=11&level=surface&overlay=wind&product=ecmwf` +
+    `&width=650&height=450&zoom=${z}&level=surface&overlay=wind&product=ecmwf` +
     `&menu=&message=true&marker=true&calendar=now&pressure=&type=map&location=coordinates` +
     `&detail=true&metricWind=knot&metricTemp=%C2%B0C&radarRange=-1`;
   document.getElementById('windy-frame').src = url;
+}
+
+// Focus the embedded Windy map on a specific bay and scroll to it.
+function focusBayOnMap(bay) {
+  renderWindyMap(bay.lat, bay.lng, 13);
+  const wrap = document.querySelector('.windy-wrap');
+  if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 function dayShelterFor(bay, dayIdx) {
@@ -250,10 +439,10 @@ function renderBayRow(bay, islandKey) {
     return `<div class="shelter-cell ${lbl.cls}"><span class="d">${dayLabels[i]}</span>${lbl.txt}</div>`;
   }).join('');
   const fav = isFavorite(islandKey, bay.name);
-  const windyUrl = `https://www.windy.com/?wind,${bay.lat},${bay.lng},12`;
+  const bayKey = `${islandKey}::${bay.name}`.replace(/[^a-zA-Z0-9_:]/g, '_');
   const gMapsUrl = `https://www.google.com/maps?q=${bay.lat},${bay.lng}`;
   return `
-    <div class="bay-row">
+    <div class="bay-row" data-bay-key="${bayKey}">
       <div>
         <div class="bay-name">
           <button class="fav-btn ${fav ? 'on' : ''}" data-island="${islandKey}" data-bay="${bay.name.replace(/"/g, '&quot;')}" aria-label="Toggle favourite" title="Favourite">${fav ? '★' : '☆'}</button>
@@ -264,22 +453,41 @@ function renderBayRow(bay, islandKey) {
       </div>
       <div class="bay-actions">
         <div class="shelter-row">${cells}</div>
+        ${vesselBadgeHtml(bay)}
         <div class="btn-row">
-          <a class="btn-mini" href="${windyUrl}" target="_blank" rel="noopener">Windy ↗</a>
+          <button class="btn-mini btn-windy" data-lat="${bay.lat}" data-lng="${bay.lng}" data-name="${bay.name.replace(/"/g, '&quot;')}" data-island="${islandKey}">Show on map ↑</button>
           <a class="btn-mini" href="${gMapsUrl}" target="_blank" rel="noopener">Maps ↗</a>
         </div>
       </div>
     </div>`;
 }
 
+function renderAisInfoBanner() {
+  const el = document.getElementById('ais-info-banner');
+  if (!el) return;
+  if (STATE.aisStatus === 'disabled') {
+    el.innerHTML = `<div class="ais-info">🛥 Live vessel counts are disabled. Add a free <a href="https://aisstream.io/authenticate" target="_blank" rel="noopener">AISStream.io</a> API key to <code>data.js</code> to enable them.</div>`;
+  } else if (STATE.aisStatus === 'streaming' || STATE.aisStatus === 'connecting') {
+    el.innerHTML = `<div class="ais-info">🛥 <strong>Live vessel counts</strong> show only AIS-equipped boats — typically ferries, mega-yachts, cargo, and most charter cats. Smaller monohulls and tenders are invisible to AIS.</div>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
 function renderBays() {
   const isl = ISLANDS[STATE.islandKey];
+  renderAisInfoBanner();
   const html = isl.anchorages.map(b => renderBayRow(b, STATE.islandKey)).join('');
   document.getElementById('bay-list').innerHTML = html;
   document.querySelectorAll('#bay-list .fav-btn').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       toggleFavorite(btn.dataset.island, btn.dataset.bay);
+    });
+  });
+  document.querySelectorAll('#bay-list .btn-windy').forEach(btn => {
+    btn.addEventListener('click', () => {
+      focusBayOnMap({ lat: +btn.dataset.lat, lng: +btn.dataset.lng });
     });
   });
 }
@@ -308,9 +516,12 @@ function renderFavorites() {
       const dayLabel = STATE.forecast ? new Date(STATE.forecast.daily.time[i]).toLocaleDateString(undefined, { weekday: 'short' }) : '';
       return `<div class="shelter-cell ${lbl.cls}"><span class="d">${dayLabel}</span>${lbl.txt}</div>`;
     }).join('');
-    const windyUrl = `https://www.windy.com/?wind,${bay.lat},${bay.lng},12`;
+    const bayKey = `${island}::${name}`.replace(/[^a-zA-Z0-9_:]/g, '_');
+    const showOnMapBtn = sameIsland
+      ? `<button class="btn-mini btn-windy" data-lat="${bay.lat}" data-lng="${bay.lng}" data-name="${name.replace(/"/g, '&quot;')}" data-island="${island}">Show on map ↑</button>`
+      : `<button class="btn-mini" data-go="${island}">Switch to ${isl.name} ↗</button>`;
     return `
-      <div class="bay-row">
+      <div class="bay-row" data-bay-key="${bayKey}">
         <div>
           <div class="bay-name">
             <button class="fav-btn on" data-island="${island}" data-bay="${name.replace(/"/g, '&quot;')}" title="Remove from favourites">★</button>
@@ -322,8 +533,7 @@ function renderFavorites() {
         <div class="bay-actions">
           <div class="shelter-row">${cells}</div>
           <div class="btn-row">
-            <a class="btn-mini" href="${windyUrl}" target="_blank" rel="noopener">Windy ↗</a>
-            <button class="btn-mini" data-go="${island}">Switch to ${isl.name} ↗</button>
+            ${showOnMapBtn}
           </div>
         </div>
       </div>`;
@@ -333,6 +543,11 @@ function renderFavorites() {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       toggleFavorite(btn.dataset.island, btn.dataset.bay);
+    });
+  });
+  list.querySelectorAll('.btn-windy').forEach(btn => {
+    btn.addEventListener('click', () => {
+      focusBayOnMap({ lat: +btn.dataset.lat, lng: +btn.dataset.lng });
     });
   });
   list.querySelectorAll('[data-go]').forEach(btn => {
@@ -434,6 +649,9 @@ async function loadIsland() {
   renderFavorites();
   renderDistanceTool();
   renderTides();
+
+  // Open AIS WebSocket for live vessel counts (if API key configured).
+  connectAisForIsland(STATE.islandKey);
 }
 
 // ─── Boot ──────────────────────────────────────────────────────────────────
